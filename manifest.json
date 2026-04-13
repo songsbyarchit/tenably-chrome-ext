@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Tenably Importer",
+  "description": "Import SpareRoom listings to Tenably in one click",
+  "version": "2.0",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://www.spareroom.co.uk/*",
+    "https://spareroom.co.uk/*",
+    "https://m.spareroom.co.uk/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.spareroom.co.uk/*",
+        "https://spareroom.co.uk/*",
+        "https://m.spareroom.co.uk/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Tenably Importer"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["tenably.html", "tenably.js", "scorer.js", "init.js"],
+      "matches": [
+        "https://www.spareroom.co.uk/*",
+        "https://spareroom.co.uk/*",
+        "https://m.spareroom.co.uk/*"
+      ]
+    }
+  ]
+}
