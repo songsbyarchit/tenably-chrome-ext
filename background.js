@@ -1,7 +1,24 @@
 // Tenably background service worker
 // Handles: opening background tabs, scraping them, closing them, storing results
 
-const SCRAPE_TIMEOUT = 8000; // ms to wait for a listing tab to load
+const SCRAPE_TIMEOUT = 12000; // ms to wait for a listing tab to load
+
+// ── Web app URL (change to production URL when deployed) ─────────────────────
+const WEB_APP_URL = 'http://localhost:5173';
+
+// ── Inject listing data into the web app tab via scripting API ───────────────
+// No URL params — full data (description, photos, everything) injected directly.
+function injectListings(tabId, listings) {
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: (data) => {
+      // Store on window so React can read it even if it mounts after injection
+      window.__tenablyImport = data;
+      window.dispatchEvent(new CustomEvent('tenably-import', { detail: data }));
+    },
+    args: [listings],
+  }).catch(err => console.warn('Tenably inject failed:', err));
+}
 
 // ── Open a listing URL in background, wait for content script to scrape it ──
 function scrapeListingTab(url) {
@@ -30,10 +47,10 @@ function scrapeListingTab(url) {
       function onUpdated(updatedTabId, changeInfo) {
         if (updatedTabId === tabId && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(onUpdated);
-          // Small delay to let lazy-load images settle
+          // Delay to let SpareRoom's lazy-load gallery fully hydrate
           setTimeout(() => {
             chrome.tabs.sendMessage(tabId, { type: "TENABLY_SCRAPE_THIS" }).catch(() => {});
-          }, 1500);
+          }, 3000);
         }
       }
       chrome.tabs.onUpdated.addListener(onUpdated);
@@ -89,9 +106,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       const { added, total } = await saveListings(results);
 
-      // Open Tenably dashboard
-      const tenablyUrl = chrome.runtime.getURL("tenably.html");
-      chrome.tabs.create({ url: tenablyUrl });
+      // Open Tenably import review page, then inject full listing data
+      if (results.length > 0) {
+        chrome.tabs.create({ url: `${WEB_APP_URL}/import` }, (tab) => {
+          // Wait for the page to finish loading before injecting
+          function onUpdated(tabId, changeInfo) {
+            if (tabId === tab.id && changeInfo.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(onUpdated);
+              setTimeout(() => injectListings(tab.id, results), 500);
+            }
+          }
+          chrome.tabs.onUpdated.addListener(onUpdated);
+        });
+      }
 
       sendResponse({ added, total });
     })();
@@ -102,8 +129,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "TENABLY_SAVE_ONE") {
     (async () => {
       const { added, total } = await saveListings([msg.data]);
-      const tenablyUrl = chrome.runtime.getURL("tenably.html");
-      chrome.tabs.create({ url: tenablyUrl });
+      chrome.tabs.create({ url: `${WEB_APP_URL}/import` }, (tab) => {
+        function onUpdated(tabId, changeInfo) {
+          if (tabId === tab.id && changeInfo.status === 'complete') {
+            chrome.tabs.onUpdated.removeListener(onUpdated);
+            setTimeout(() => injectListings(tab.id, [msg.data]), 500);
+          }
+        }
+        chrome.tabs.onUpdated.addListener(onUpdated);
+      });
       sendResponse({ added, total });
     })();
     return true;

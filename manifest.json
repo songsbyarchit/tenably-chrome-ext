@@ -3,11 +3,12 @@
   "name": "Tenably Importer",
   "description": "Import SpareRoom listings to Tenably in one click",
   "version": "2.0",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": [
     "https://www.spareroom.co.uk/*",
     "https://spareroom.co.uk/*",
-    "https://m.spareroom.co.uk/*"
+    "https://m.spareroom.co.uk/*",
+    "http://localhost:5173/*"
   ],
   "background": {
     "service_worker": "background.js"

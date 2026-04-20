@@ -86,10 +86,30 @@ function applicantCardHtml(tenant, rank, monthlyRentStr) {
 
 // ── Listing block ─────────────────────────────────────────────────────────
 function listingBlockHtml(listing, idx) {
-  const photoHtml = listing.photos && listing.photos.length > 0
-    ? `<div class="listing-photo">
-         <img src="${listing.photos[0]}" alt="" onerror="this.parentElement.innerHTML='<div class=\\"photo-placeholder\\"><div class=\\"photo-placeholder-icon\\">&#127968;</div><span>No photos</span></div>'" />
-         ${listing.photos.length > 1 ? `<div class="photo-count">+${listing.photos.length - 1} photos</div>` : ""}
+  const photos  = listing.photos || [];
+  const heroId  = `hero-${listing.listingId || idx}`;
+  const stripId = `strip-${listing.listingId || idx}`;
+
+  // Build hero + strip only when there are photos
+  const photoHtml = photos.length > 0
+    ? `<div class="listing-photo-wrap">
+         <div class="listing-photo">
+           <img id="${heroId}" src="${photos[0]}" alt=""
+             onerror="this.src='';this.parentElement.innerHTML='<div class=\\"photo-placeholder\\"><div class=\\"photo-placeholder-icon\\">&#127968;</div><span>No photos</span></div>'" />
+           <div class="photo-counter" id="${stripId}-counter">1 / ${photos.length}</div>
+         </div>
+         ${photos.length > 1 ? `
+         <div class="photo-strip" id="${stripId}">
+           ${photos.map((url, pi) => `
+             <button class="strip-thumb${pi === 0 ? ' strip-thumb-active' : ''}"
+               data-hero="${heroId}" data-strip="${stripId}" data-idx="${pi}"
+               data-total="${photos.length}"
+               onclick="tenable_selectPhoto(this,'${url.replace(/'/g, "\\'")}')"
+               title="Photo ${pi + 1}">
+               <img src="${url}" alt="" loading="lazy"
+                 onerror="this.parentElement.style.display='none'" />
+             </button>`).join('')}
+         </div>` : ''}
        </div>`
     : `<div class="listing-photo"><div class="photo-placeholder"><div class="photo-placeholder-icon">&#127968;</div><span>No photos imported</span></div></div>`;
 
@@ -249,6 +269,26 @@ function setFilter(filter) {
 function switchTab(tab) {
   if (tab === "listings") renderListings(allListings);
   else                    renderTenants(SCORED_TENANTS);
+}
+
+// ── Photo strip interaction ───────────────────────────────────────────────
+function tenable_selectPhoto(btn, url) {
+  const heroEl = document.getElementById(btn.dataset.hero);
+  if (heroEl) { heroEl.src = url; }
+
+  // Update counter
+  const counter = document.getElementById(btn.dataset.strip + '-counter');
+  if (counter) counter.textContent = `${+btn.dataset.idx + 1} / ${btn.dataset.total}`;
+
+  // Swap active state within this strip
+  const strip = document.getElementById(btn.dataset.strip);
+  if (strip) {
+    strip.querySelectorAll('.strip-thumb').forEach(t => t.classList.remove('strip-thumb-active'));
+    btn.classList.add('strip-thumb-active');
+
+    // Scroll the active thumb into view inside the strip
+    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
